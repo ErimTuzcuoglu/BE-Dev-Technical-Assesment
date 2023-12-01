@@ -1,3 +1,5 @@
+import { ShowtimeInterface } from "./showtime.interface";
+
 export interface WebsiteData {
   title: string;
   metaDescription: string;

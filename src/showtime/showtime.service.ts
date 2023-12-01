@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ShowtimeEntity } from './entity/showtime.entity';
 import { DataSource, Repository } from 'typeorm';
 import { ShowtimeSummaryEntity } from './entity/showtimeSummary.entity';
+import { ShowtimeInterface } from 'src/scraper/interface/showtime.interface';
 
 @Injectable()
 export class ShowtimeService {
@@ -15,7 +16,11 @@ export class ShowtimeService {
   ) {}
 
   private async updateShowtimeSummary() {
-    await this.dataSource.query(`
+    const entityManager = this.showtimeSummaryEntityRepository.manager;
+
+    try {
+      await entityManager.transaction(async (transactionalEntityManager) => {
+        await transactionalEntityManager.query(`
         INSERT INTO "showtime-summary"
         ("showtimeDate",
          "cinemaName",
@@ -23,14 +28,19 @@ export class ShowtimeService {
          attributes,
          city,
          "showtimeCount")
-        select date(showtime."showtimeInUTC" AT TIME ZONE 'UTC'),
+        SELECT date(showtime."showtimeInUTC" AT TIME ZONE 'UTC'),
             showtime."cinemaName",
             showtime."movieTitle",
             showtime.attributes,
             showtime.city,
-            count(*)
-        from "showtime"
-        group by 1, 2, 3, 4, 5
+        COUNT(*) AS "showtimeCount"
+        FROM "showtime"
+        GROUP BY
+            date(showtime."showtimeInUTC" AT TIME ZONE 'UTC'),
+            showtime."cinemaName",
+            showtime."movieTitle",
+            showtime.attributes,
+            showtime.city
         ON CONFLICT
             (
             "showtimeDate",
@@ -41,34 +51,39 @@ export class ShowtimeService {
             )
             DO UPDATE
                    SET "showtimeCount"= EXCLUDED."showtimeCount"
-    `);
-    //TODO: Investigate and resolve the duplication issue in the "showtime-summary" table.
-    // If you check the "showtime-summary" table rows you will notice that there duplicate rows.
-    // Analyze the current aggregation query to identify why duplicates are being created.
-    // Modify the query or the table structure as necessary to prevent duplicate entries.
-    // Ensure your solution maintains data integrity and optimizes performance.
+      `);
+      });
+    } catch (error) {
+      console.error('Transaction failed:', error);
+      throw error;
+    }
   }
 
   async addShowtimes(showtimes: ShowtimeInterface[]) {
     for (const showtime of showtimes) {
-      await this.dataSource
-        .createQueryBuilder()
-        .insert()
-        .into(ShowtimeEntity)
-        .values({
-          showtimeId: showtime.showtimeId,
-          movieTitle: showtime.movieTitle,
-          cinemaName: showtime.cinemaName,
-          showtimeInUTC: showtime.showtimeInUTC,
-          bookingLink: showtime.bookingLink,
-          attributes: showtime.attributes,
-        })
-        .execute();
-
-      //TODO: Implement error handling for cases where a duplicate 'showtimeId' is used during insertion.
-      // Consider how the application should behave in this scenario (e.g., skip, replace, or abort the operation).
-      // Implement the necessary logic and provide feedback or logging for the operation outcome.
-      // Ensure your solution handles such conflicts gracefully without causing data inconsistency or application failure.
+      try {
+        await this.showtimeEntityRepository
+          .createQueryBuilder()
+          .insert()
+          .into(ShowtimeEntity)
+          .values({
+            showtimeId: showtime.showtimeId,
+            movieTitle: showtime.movieTitle,
+            cinemaName: showtime.cinemaName,
+            showtimeInUTC: showtime.showtimeInUTC,
+            bookingLink: showtime.bookingLink,
+            attributes: showtime.attributes,
+            city: showtime.cinemaName.split('-')[1].trim()
+          })
+          .execute();
+      } catch (error) {
+        if (error.code === '23505' && error.detail.includes('showtimeId')) {
+          console.error(`Duplicate showtimeId: ${showtime.showtimeId}. Skipping.`);
+          continue;
+        } else {
+          throw error;
+        }
+      }
     }
     await this.updateShowtimeSummary();
   }

@@ -1,5 +1,5 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, HttpException, HttpStatus, Query } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiNotFoundResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ScraperRequestDto } from './dto/scraper-request.dto';
 import { ScraperService } from './scraper.service';
 import { ScraperResponseDto } from './dto/scraper-response.dto';
@@ -12,13 +12,30 @@ export class ScraperController {
   @ApiOperation({
     summary: 'Initiate a new scraping process for the provided URL',
   })
-  // TODO: Complete the Swagger response documentation. Ensure the following:
-  //  1. Document the 200 OK response, utilizing the ScraperResponseDto. This includes a detailed description and potential example values for the fields.
-  //  2. Outline common error responses, such as 400 Bad Request or 404 Not Found, including what circumstances might trigger these errors.
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully initiated scraping process',
+    type: ScraperResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Bad Request: Invalid URL or missing parameters',
+  })
+  @ApiNotFoundResponse({
+    description: 'Not Found: The specified URL does not exist or cannot be reached',
+  })
   @Get('scrape')
-  scrapeRequest(
+  async scrapeRequest(
     @Query() scrapeRequestDto: ScraperRequestDto,
   ): Promise<ScraperResponseDto> {
-    return this.scraperService.scrape(scrapeRequestDto.url);
+    try {
+      const result = await this.scraperService.scrape(scrapeRequestDto.url);
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error; 
+      } else {
+        throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+    }
   }
 }

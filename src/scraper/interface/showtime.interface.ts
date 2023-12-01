@@ -1,4 +1,4 @@
-interface ShowtimeInterface {
+export interface ShowtimeInterface {
   showtimeId: string;
   cinemaName: string;
   movieTitle: string;

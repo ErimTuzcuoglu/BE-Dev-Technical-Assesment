@@ -1,4 +1,15 @@
-# TODO: Create Kubernetes configuration files for the application deployment and service.
-#   Service Configuration: Create a 'service.yaml' file.
-#    - Determine the type of service you need (ClusterIP, NodePort, LoadBalancer) based on your cluster setup or exposure requirements.
-#    - Define the necessary specifications, including selector matchLabels and ports (targetPort, port, and possibly nodePort for NodePort service type).
+apiVersion: v1
+kind: Service
+metadata:
+  name: scraper-app-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scraper-app
+      tier: backend 
+  ports:
+    - protocol: TCP
+      port: 3000  # Port on which the service will be exposed within the cluster
+      targetPort: 3000  # Port on which your application is listening
+  type: ClusterIP  

@@ -4,10 +4,11 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 @Entity({ name: 'showtime', orderBy: { id: 'ASC' } })
-//TODO: add index if necessary
+// @Index(['id, movieTitle, cinemaName, showtimeInUTC, bookingLink, attributes'])
 export class ShowtimeEntity {
   @PrimaryGeneratedColumn()
   id: number;
