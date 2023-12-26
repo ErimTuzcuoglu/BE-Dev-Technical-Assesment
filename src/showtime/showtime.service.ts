@@ -35,6 +35,33 @@ export class ShowtimeService {
             showtime.city,
         COUNT(*) AS "showtimeCount"
         FROM "showtime"
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM "showtime-summary" ss
+          LEFT JOIN (
+              SELECT
+                  "showtimeDate",
+                  "cinemaName",
+                  "movieTitle",
+                  attributes,
+                  city,
+                  COUNT(*) AS "showtimeCount"
+              FROM "showtime-summary"
+              GROUP BY
+                  "showtimeDate",
+                  "cinemaName",
+                  "movieTitle",
+                  attributes,
+                  city
+          ) existing_summary
+            ON
+                existing_summary."showtimeDate" = date(showtime."showtimeInUTC" AT TIME ZONE 'UTC')
+                AND existing_summary."cinemaName" = showtime."cinemaName"
+                AND existing_summary."movieTitle" = showtime."movieTitle"
+                AND existing_summary.attributes = showtime.attributes
+                AND existing_summary.city = showtime.city
+            WHERE existing_summary."showtimeCount" IS NULL
+        )
         GROUP BY
             date(showtime."showtimeInUTC" AT TIME ZONE 'UTC'),
             showtime."cinemaName",
@@ -73,7 +100,6 @@ export class ShowtimeService {
             showtimeInUTC: showtime.showtimeInUTC,
             bookingLink: showtime.bookingLink,
             attributes: showtime.attributes,
-            city: showtime.cinemaName.split('-')[1].trim()
           })
           .execute();
       } catch (error) {
